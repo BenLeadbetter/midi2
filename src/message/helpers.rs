@@ -25,6 +25,10 @@ pub fn note_from_packet(p: &[u32]) -> u7 {
     p[0].octet(2).truncate()
 }
 
+pub fn note_from_bytes(_p: &[u8]) -> u7 {
+    todo!()
+}
+
 pub fn clear_buffer<T: core::default::Default>(p: &mut [T]) -> &mut [T] {
     for d in &mut *p {
         *d = Default::default();
@@ -59,6 +63,10 @@ pub fn group_from_packet(p: &[u32]) -> u4 {
 
 pub fn channel_from_packet(p: &[u32]) -> u4 {
     p[0].nibble(3)
+}
+
+pub fn channel_from_bytes(_p: &[u8]) -> u4 {
+    todo!()
 }
 
 pub fn sysex_group_consistent_groups(buffer: &[u32], stride: usize) -> Result<()> {
@@ -124,8 +132,18 @@ mod tests {
     }
 
     #[test]
+    fn test_channel_from_bytes() {
+        assert_eq!(channel_from_bytes(&[0b1000_0101]), u4::new(0b0101));
+    }
+
+    #[test]
     fn test_note_from_packet() {
         assert_eq!(note_from_packet(&[0x0000_3200]), u7::new(0x32));
+    }
+
+    #[test]
+    fn test_note_from_bytes() {
+        assert_eq!(note_from_packet(&[0x0, 0x60]), u7::new(0x60));
     }
 
     #[test]

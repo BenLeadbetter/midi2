@@ -11,6 +11,15 @@ const OP_CODE: u4 = u4::new(0b1101);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChannelPressureMessage<'a, B: Buffer>(&'a B::Data);
 
+impl<'a> ChannelPressureMessage<'a, Bytes> {
+    pub fn channel(&self) -> u4 {
+        message_helpers::channel_from_bytes(self.0)
+    }
+    pub fn pressure(&self) -> u7 {
+        message_helpers::note_from_bytes(self.0)
+    }
+}
+
 impl<'a> ChannelPressureMessage<'a, Ump> {
     pub fn channel(&self) -> u4 {
         message_helpers::channel_from_packet(self.0)
@@ -29,6 +38,20 @@ impl<'a> Message<'a, Ump> for ChannelPressureMessage<'a, Ump> {
     }
     fn data(&self) -> &'a [u32] {
         self.0
+    }
+}
+
+impl<'a> Message<'a, Bytes> for ChannelPressureMessage<'a, Bytes> {
+    fn data(&self) -> &'a <Bytes as Buffer>::Data {
+        self.0
+    }
+
+    fn validate_data(_buffer: &'a <Bytes as Buffer>::Data) -> Result<()> {
+        todo!()
+    }
+
+    fn from_data_unchecked(buffer: &'a <Bytes as Buffer>::Data) -> Self {
+        Self(buffer)
     }
 }
 
@@ -110,7 +133,7 @@ mod tests {
     #[test]
     fn group() {
         assert_eq!(
-            ChannelPressureMessage::from_data(&[0x2FD6_0900])
+            ChannelPressureMessage::<Ump>::from_data(&[0x2FD6_0900])
                 .unwrap()
                 .group(),
             u4::new(0xF),
@@ -120,7 +143,7 @@ mod tests {
     #[test]
     fn channel() {
         assert_eq!(
-            ChannelPressureMessage::from_data(&[0x2FD6_0900])
+            ChannelPressureMessage::<Ump>::from_data(&[0x2FD6_0900])
                 .unwrap()
                 .channel(),
             u4::new(0x6),
@@ -130,7 +153,7 @@ mod tests {
     #[test]
     fn pressure() {
         assert_eq!(
-            ChannelPressureMessage::from_data(&[0x2FD6_0900])
+            ChannelPressureMessage::<Ump>::from_data(&[0x2FD6_0900])
                 .unwrap()
                 .pressure(),
             u7::new(0x09),
