@@ -359,4 +359,19 @@ mod std_tests {
                 .unwrap(),
         );
     }
+
+    #[test]
+    fn byte_data() {
+        assert_eq!(
+            Sysex7BytesOwned::builder()
+                .payload((0u8..20u8).map(|v| v.truncate()))
+                .build()
+                .unwrap()
+                .byte_data(),
+            &[
+                0xF0, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C,
+                0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0xF7,
+            ],
+        );
+    }
 }
