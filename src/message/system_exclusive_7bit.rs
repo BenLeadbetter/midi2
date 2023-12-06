@@ -512,7 +512,6 @@ pub struct Sysex7BorrowedBuilder<'a> {
 #[cfg(feature = "std")]
 pub struct Sysex7Builder<M: core::convert::From<Sysex7Owned>> {
     buffer: std::vec::Vec<u32>,
-    size: usize,
     error: Option<Error>,
     group: u4,
     _phantom_message: core::marker::PhantomData<M>,
@@ -534,7 +533,8 @@ impl<'a> Sysex7BorrowedBuilder<'a> {
             self.error = Some(Error::BufferOverflow);
             return;
         }
-        grow(self.buffer, &mut self.size, self.group)
+        grow(self.buffer, self.size, self.group);
+        self.size += 1;
     }
     pub fn build(self) -> Result<Sysex7Borrowed<'a>> {
         if let Some(e) = &self.error {
@@ -629,7 +629,6 @@ impl<M: core::convert::From<Sysex7Owned>> Sysex7Builder<M> {
     pub fn new() -> Self {
         Sysex7Builder {
             buffer: std::vec::Vec::new(),
-            size: 0,
             error: None,
             group: u4::new(0x0),
             _phantom_message: Default::default(),
@@ -640,7 +639,8 @@ impl<M: core::convert::From<Sysex7Owned>> Sysex7Builder<M> {
             return self;
         }
         self.group = g;
-        for chunk in self.buffer[..self.size * 2].chunks_exact_mut(2) {
+        let size = self.size();
+        for chunk in self.buffer[..size * 2].chunks_exact_mut(2) {
             chunk[0].set_nibble(1, g);
         }
         self
@@ -654,12 +654,12 @@ impl<M: core::convert::From<Sysex7Owned>> Sysex7Builder<M> {
             return self;
         };
 
-        if self.size == 0 {
+        if self.size() == 0 {
             self.grow();
         }
 
         let data_start: usize = {
-            let current_size = message_size(&self.buffer, message_index(self.size));
+            let current_size = message_size(&self.buffer, message_index(self.size()));
             if current_size == u4::new(6) {
                 self.grow();
                 0
@@ -668,15 +668,16 @@ impl<M: core::convert::From<Sysex7Owned>> Sysex7Builder<M> {
             }
         };
 
-        self.buffer[message_index(self.size) + (data_start + 2) / 4]
+        let size = self.size();
+        self.buffer[message_index(size) + (data_start + 2) / 4]
             .set_octet((2 + data_start) % 4, first.into());
-        increment_message_size(&mut self.buffer, message_index(self.size));
+        increment_message_size(&mut self.buffer, message_index(size));
 
         let mut stop = false;
         for i in (data_start + 1)..6 {
             match iter.next() {
                 Some(v) => {
-                    let index = message_index(self.size);
+                    let index = message_index(self.size());
                     self.buffer[index + (i + 2) / 4].set_octet((2 + i) % 4, v.into());
                     increment_message_size(&mut self.buffer, index);
                 }
@@ -695,8 +696,12 @@ impl<M: core::convert::From<Sysex7Owned>> Sysex7Builder<M> {
     }
 
     fn grow(&mut self) {
+        let size = self.size();
         self.buffer.extend_from_slice(&[0x0; 2]);
-        grow(&mut self.buffer, &mut self.size, self.group)
+        grow(&mut self.buffer, size, self.group)
+    }
+    fn size(&self) -> usize {
+        self.buffer.len() / 2
     }
 }
 
@@ -721,9 +726,9 @@ fn increment_message_size(buffer: &mut [u32], message_index: usize) {
 // Adds an additional sysex message to the end of the group.
 // Updates the status of the previous message so that the
 // group statuses together remain valid.
-fn grow(buffer: &mut [u32], size: &mut usize, group: u4) {
+fn grow(buffer: &mut [u32], size: usize, group: u4) {
     {
-        let mut builder = Sysex7PartialBorrowed::builder(&mut buffer[2 * *size..2 * (*size + 1)]);
+        let mut builder = Sysex7PartialBorrowed::builder(&mut buffer[2 * size..2 * (size + 1)]);
         builder = builder.group(group);
         match size {
             0 => {
@@ -736,9 +741,9 @@ fn grow(buffer: &mut [u32], size: &mut usize, group: u4) {
         builder.build().expect("successful message build");
     }
 
-    if *size != 0 {
+    if size != 0 {
         let mut prev_builder =
-            Sysex7PartialBorrowedBuilder(Ok(&mut buffer[2 * (*size - 1)..2 * *size]));
+            Sysex7PartialBorrowedBuilder(Ok(&mut buffer[2 * (size - 1)..2 * size]));
         match size {
             1 => {
                 prev_builder = prev_builder.status(Status::Begin);
@@ -749,7 +754,6 @@ fn grow(buffer: &mut [u32], size: &mut usize, group: u4) {
         }
         prev_builder.build().expect("successful message build");
     }
-    *size += 1;
 }
 
 #[cfg(test)]
